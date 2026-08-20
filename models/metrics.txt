@@ -1,0 +1,27 @@
+================ GATEGUARD MODEL METRICS REPORT ================
+
+Evaluated on N=98 test samples (16 malicious, 82 benign), synthetic + CSIC 2010 + OWASP SecLists dataset.
+
+Dataset Partitioning:
+  - Total Samples     : 491
+  - Train Set Size    : 393 (80.04%)
+  - Test Set Size     : 98 (19.96%)
+
+Overall Performance:
+  - Accuracy          : 1.0000 (100.00%)
+
+Confusion Matrix:
+  [[TN FP] [FN TP]]
+  [[82, 0], [0, 16]]
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign       1.00      1.00      1.00        82
+   Malicious       1.00      1.00      1.00        16
+
+    accuracy                           1.00        98
+   macro avg       1.00      1.00      1.00        98
+weighted avg       1.00      1.00      1.00        98
+
+=================================================================

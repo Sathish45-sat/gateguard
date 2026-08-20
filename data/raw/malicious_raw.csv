@@ -1,0 +1,31 @@
+request_string,label,technique,base_sample_id
+POST /api/v1/user/profile name=John+Doe&email=john@example.com,0,raw,ben_raw_0001
+GET /search?q=laptop&category=electronics HTTP/1.1,0,raw,ben_raw_0002
+POST /contact message=Hello+support+team HTTP/1.1,0,raw,ben_raw_0003
+GET /assets/style.css HTTP/1.1,0,raw,ben_raw_0004
+GET /images/logo.png HTTP/1.1,0,raw,ben_raw_0005
+POST /settings theme=dark&notifications=true HTTP/1.1,0,raw,ben_raw_0006
+POST /checkout item_id=402&quantity=1&payment=card,0,raw,ben_raw_0007
+POST /feedback rating=5&comments=Great+service HTTP/1.1,0,raw,ben_raw_0008
+GET /download/report.pdf HTTP/1.1,0,raw,ben_raw_0009
+POST /login username=admin&password=Password123!,0,raw,ben_raw_0010
+GET /products?page=2&sort=asc HTTP/1.1,0,raw,ben_raw_0011
+GET /api/status HTTP/1.1,0,raw,ben_raw_0012
+GET /index.html HTTP/1.1,0,raw,ben_raw_0013
+GET /blog/posts/security-best-practices HTTP/1.1,0,raw,ben_raw_0014
+GET /about-us HTTP/1.1,0,raw,ben_raw_0015
+' OR '1'='1,1,raw,mal_0001
+"<iframe src=""javascript:alert('XSS')"">",1,raw,mal_0002
+'; DROP TABLE users; --,1,raw,mal_0003
+'; EXEC xp_cmdshell('dir');--,1,raw,mal_0004
+1' HAVING 1=1--,1,raw,mal_0005
+<svg onload=alert(document.cookie)>,1,raw,mal_0006
+admin' --,1,raw,mal_0007
+<img src=x onerror=alert(1)>,1,raw,mal_0008
+| cat /etc/passwd,1,raw,mal_0009
+<?php system($_GET['cmd']); ?>,1,raw,mal_0010
+<script>alert('XSS')</script>,1,raw,mal_0011
+"1 UNION SELECT null, username, password FROM users--",1,raw,mal_0012
+"1' AND 1=1 UNION ALL SELECT 1,2,3,table_name FROM information_schema.tables--",1,raw,mal_0013
+../../../../etc/passwd,1,raw,mal_0014
+' OR 1=1#,1,raw,mal_0015
