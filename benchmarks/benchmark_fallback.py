@@ -13,6 +13,7 @@ import statistics
 import time
 import urllib.parse
 import urllib.request
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 BENIGN_QUERIES = [
@@ -53,21 +54,30 @@ def send_request(url, method="GET", data=None, headers=None):
     start_time = time.perf_counter()
     status_code = 0
     success = False
+    response_body = None
 
     try:
         with urllib.request.urlopen(req, timeout=5) as response:
             status_code = response.status
             success = 200 <= status_code < 400
+            try:
+                response_body = response.read()
+            except Exception:
+                response_body = None
     except urllib.error.HTTPError as e:
         status_code = e.code
         # In security proxy tests, 401/403/400 blocks can be valid responses for attack payloads
         success = status_code in (200, 201, 400, 401, 403)
+        try:
+            response_body = e.read()
+        except Exception:
+            response_body = None
     except Exception as e:
         status_code = 0
         success = False
 
     latency_ms = (time.perf_counter() - start_time) * 1000.0
-    return latency_ms, status_code, success
+    return latency_ms, status_code, success, response_body
 
 
 def simulate_user_session(base_url, requests_per_user):
@@ -82,27 +92,44 @@ def simulate_user_session(base_url, requests_per_user):
     benign_latencies = []
     attack_latencies = []
 
-    # Step 1: Login
+    # Step 1: Login to get a unique session token for this user
     login_url = f"{base_url.rstrip('/')}/login"
-    login_payload = {"username": f"user_{random.randint(100, 999)}", "password": "SecretPassword123!"}
-    lat, status, ok = send_request(login_url, method="POST", data=login_payload)
+    user_id = str(uuid.uuid4())[:8]
+    login_payload = {"username": f"user_{user_id}", "password": "SecretPassword123!"}
+    lat, status, ok, resp_body = send_request(login_url, method="POST", data=login_payload)
     latencies.append(lat)
     if ok:
         success_count += 1
     else:
         failure_count += 1
 
-    token = f"token_{random.randint(1000, 9999)}"
+    # Extract session token from login response body, or fallback to a unique UUID token per user
+    token = None
+    if resp_body:
+        try:
+            resp_json = json.loads(resp_body.decode("utf-8"))
+            token = (
+                resp_json.get("token")
+                or resp_json.get("session_token")
+                or resp_json.get("access_token")
+                or resp_json.get("token_hash")
+            )
+        except Exception:
+            token = None
+
+    if not token:
+        token = f"token_{uuid.uuid4().hex[:12]}"
+
     headers = {"Authorization": f"Bearer {token}"}
 
-    # Step 2: Search queries
+    # Step 2: Search queries using this user's isolated session token
     for _ in range(requests_per_user - 1):
         is_attack = random.random() < 0.3  # 30% attack queries
         query = random.choice(ATTACK_QUERIES) if is_attack else random.choice(BENIGN_QUERIES)
         encoded_query = urllib.parse.quote(query)
         search_url = f"{base_url.rstrip('/')}/search?q={encoded_query}"
 
-        lat, status, ok = send_request(search_url, method="GET", headers=headers)
+        lat, status, ok, _ = send_request(search_url, method="GET", headers=headers)
         latencies.append(lat)
 
         if is_attack:
