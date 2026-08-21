@@ -525,7 +525,7 @@ func sessionKillMiddleware(rdb *redis.Client, next http.Handler) http.Handler {
 // cachePreCheckMiddleware checks LRU cache before scoring and forwarding requests.
 func cachePreCheckMiddleware(cache *lru.Cache[string, bool], next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/healthz" || r.URL.Path == "/logs" {
+		if r.URL.Path == "/healthz" || r.URL.Path == "/logs" || r.URL.Path == "/debug/flush-redis" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -614,6 +614,39 @@ func setupServerWithRedis(backendTarget string, rdb *redis.Client) (http.Handler
 		w.Header().Set("Content-Type", "application/json")
 		logs := globalLogBuffer.GetLogs()
 		json.NewEncoder(w).Encode(logs)
+	})
+
+	// POST /debug/flush-redis endpoint to flush all Redis data (gated behind GATEGUARD_TEST_MODE)
+	mux.HandleFunc("/debug/flush-redis", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "*")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		if os.Getenv("GATEGUARD_TEST_MODE") != "true" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte(`{"error":"test_mode_disabled","message":"debug endpoints require GATEGUARD_TEST_MODE=true"}` + "\n"))
+			return
+		}
+
+		ctx := r.Context()
+		if err := rdb.FlushAll(ctx).Err(); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"error":"flush_failed","message":"%s"}`+"\n", err.Error())
+			return
+		}
+
+		// Also reset the in-memory log buffer so logs start clean
+		globalLogBuffer = NewLogBuffer(100)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok","message":"Redis and log buffer flushed successfully"}` + "\n"))
 	})
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
