@@ -376,6 +376,12 @@ func computeCacheKey(r *http.Request) (string, error) {
 // sessionKillMiddleware handles session risk scoring across clean, challenged, suspicious, killed, and blocklisted tiers.
 func sessionKillMiddleware(rdb *redis.Client, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Bypass internal proxy endpoints from threat scoring & log buffering
+		if r.URL.Path == "/logs" || r.URL.Path == "/healthz" || r.URL.Path == "/debug/flush-redis" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		token := extractSessionToken(r)
 		tokenHash := ""
 		displayHash := "anon"
@@ -558,6 +564,11 @@ func cachePreCheckMiddleware(cache *lru.Cache[string, bool], next http.Handler) 
 // loggingMiddleware logs the request method, path, and response status to stdout.
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/logs" || r.URL.Path == "/healthz" || r.URL.Path == "/debug/flush-redis" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		wrapped := &statusResponseWriter{
 			ResponseWriter: w,
 			statusCode:     http.StatusOK,

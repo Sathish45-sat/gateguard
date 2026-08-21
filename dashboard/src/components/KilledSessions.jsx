@@ -1,9 +1,9 @@
 import React from 'react';
-import { Skull, Key, Clock, ShieldX } from 'lucide-react';
+import { Skull, Key, Clock, ShieldX, Ban } from 'lucide-react';
 
 export default function KilledSessions({ logs, isGlowing }) {
-  // Extract killed log items
-  const killedLogs = logs.filter((log) => log.status === 'killed');
+  // Extract killed & blocklisted log items
+  const killedLogs = logs.filter((log) => log.status === 'killed' || log.status === 'blocklisted');
 
   return (
     <div 
@@ -26,7 +26,7 @@ export default function KilledSessions({ logs, isGlowing }) {
           </div>
           <div>
             <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider font-mono">
-              KILLED SESSIONS
+              KILLED & BLOCKED SESSIONS
             </h3>
             <p className="text-[11px] text-slate-400">
               Revoked session tokens blocked by inline GateGuard proxy
@@ -47,57 +47,72 @@ export default function KilledSessions({ logs, isGlowing }) {
       <div className="mt-4 overflow-y-auto max-h-[380px] space-y-3 pr-1">
         {killedLogs.length === 0 ? (
           <div className="p-8 text-center text-slate-500 font-mono text-xs border border-dashed border-slate-800 rounded-xl">
-            No session tokens killed yet.
+            No session tokens killed or blocklisted yet.
           </div>
         ) : (
-          killedLogs.map((item, index) => (
-            <div
-              key={index}
-              className={`bg-slate-900/80 border rounded-xl p-3 font-mono text-xs transition-all hover:translate-x-1 ${
-                index === 0 && isGlowing
-                  ? 'border-rose-400 bg-rose-950/40 shadow-[0_0_20px_rgba(244,63,94,0.5)] scale-[1.02]'
-                  : 'border-rose-500/30 hover:border-rose-500/60'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                {/* Truncated Session Token */}
-                <div className="flex items-center space-x-1.5 text-rose-400 font-bold">
-                  <Key className="w-3.5 h-3.5" />
-                  <span>{item.token_hash}</span>
-                  {index === 0 && isGlowing && (
-                    <span className="px-1.5 py-0.2 bg-rose-500 text-white text-[9px] uppercase font-extrabold rounded animate-ping">
-                      NEW
+          killedLogs.map((item, index) => {
+            const isBlocklisted = item.status === 'blocklisted';
+            return (
+              <div
+                key={index}
+                className={`bg-slate-900/80 border rounded-xl p-3 font-mono text-xs transition-all hover:translate-x-1 ${
+                  index === 0 && isGlowing
+                    ? 'border-rose-400 bg-rose-950/40 shadow-[0_0_20px_rgba(244,63,94,0.5)] scale-[1.02]'
+                    : isBlocklisted
+                    ? 'border-purple-500/40 bg-purple-950/20 hover:border-purple-500/70'
+                    : 'border-rose-500/30 hover:border-rose-500/60'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  {/* Truncated Session Token */}
+                  <div className="flex items-center space-x-1.5 font-bold">
+                    <Key className={`w-3.5 h-3.5 ${isBlocklisted ? 'text-purple-400' : 'text-rose-400'}`} />
+                    <span className={isBlocklisted ? 'text-purple-300' : 'text-rose-400'}>{item.token_hash}</span>
+                    <span className={`px-1.5 py-0.5 text-[9px] uppercase font-extrabold rounded border ${
+                      isBlocklisted
+                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                        : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                    }`}>
+                      {isBlocklisted ? 'BLOCKLISTED' : '2-STRIKES KILLED'}
                     </span>
-                  )}
+                    {index === 0 && isGlowing && (
+                      <span className="px-1.5 py-0.2 bg-rose-500 text-white text-[9px] uppercase font-extrabold rounded animate-ping">
+                        NEW
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Kill Timestamp */}
+                  <div className="flex items-center space-x-1 text-slate-400 text-[11px]">
+                    <Clock className="w-3 h-3 text-slate-500" />
+                    <span>{new Date(item.timestamp).toLocaleTimeString()}</span>
+                  </div>
                 </div>
 
-                {/* Kill Timestamp */}
-                <div className="flex items-center space-x-1 text-slate-400 text-[11px]">
-                  <Clock className="w-3 h-3 text-slate-500" />
-                  <span>{new Date(item.timestamp).toLocaleTimeString()}</span>
+                {/* Attack Vector & Source IP */}
+                <div className="text-[11px] text-slate-300 bg-slate-950/70 p-2 rounded border border-slate-800 space-y-1">
+                  <div className="flex items-center justify-between text-slate-400 text-[10px]">
+                    <span>TRIGGER PATH</span>
+                    <span className={isBlocklisted ? 'text-purple-400 font-bold' : 'text-rose-400 font-bold'}>
+                      RISK SCORE: {item.risk_score !== null && item.risk_score !== undefined ? item.risk_score : 'N/A (UNSCORED)'}
+                    </span>
+                  </div>
+                  <div className={`font-semibold truncate ${isBlocklisted ? 'text-purple-200' : 'text-rose-300'}`} title={item.path}>
+                    {item.path}
+                  </div>
+                  <div className="text-slate-400 text-[10px] pt-0.5 flex justify-between">
+                    <span>SOURCE IP: {item.ip}</span>
+                    <span className={isBlocklisted ? 'text-purple-400 font-semibold' : 'text-rose-400 font-semibold'}>
+                      {isBlocklisted ? 'PRE-CHECK BLOCKED (403)' : 'ACTION: TERMINATED (403)'}
+                    </span>
+                  </div>
                 </div>
               </div>
-
-              {/* Attack Vector & Source IP */}
-              <div className="text-[11px] text-slate-300 bg-slate-950/70 p-2 rounded border border-slate-800 space-y-1">
-                <div className="flex items-center justify-between text-slate-400 text-[10px]">
-                  <span>TRIGGER PATH</span>
-                  <span className="text-rose-400 font-bold">RISK SCORE: {item.risk_score}</span>
-                </div>
-                <div className="text-rose-300 font-semibold truncate" title={item.path}>
-                  {item.path}
-                </div>
-                <div className="text-slate-400 text-[10px] pt-0.5 flex justify-between">
-                  <span>SOURCE IP: {item.ip}</span>
-                  <span className="text-slate-500">ACTION: TERMINATED</span>
-                </div>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
     </div>
   );
 }
-

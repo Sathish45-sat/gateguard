@@ -188,7 +188,8 @@ async def search(q: str, request: Request):
     }
 
 
+@app.get("/health")
 @app.get("/")
 async def root():
-    """Root status endpoint."""
+    """Health check endpoint."""
     return {"status": "ok", "app": "GateGuard Demo Backend", "active_sessions": len(SESSIONS)}

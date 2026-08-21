@@ -98,14 +98,16 @@ export default function App() {
 
     // 3. Add Toast/Banner notification
     const alertId = `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    const isBlocklisted = killedLog.status === 'blocklisted';
     const newAlert = {
       id: alertId,
       token_hash: tokenHash,
-      risk_score: killedLog.risk_score || 95,
+      risk_score: killedLog.risk_score !== null && killedLog.risk_score !== undefined ? killedLog.risk_score : 'N/A',
+      status: killedLog.status || 'killed',
       path: killedLog.path || '/search?q=UNION+SELECT',
-      ip: killedLog.ip || '192.168.1.104',
+      ip: killedLog.ip || '127.0.0.1',
       timestamp: killedLog.timestamp || new Date().toISOString(),
-      strikes: 2
+      strikes: isBlocklisted ? 'PRE-CHECK' : 2
     };
 
     setKillAlerts((prev) => [newAlert, ...prev.slice(0, 2)]); // Keep max 3 active alerts
@@ -140,15 +142,27 @@ export default function App() {
       const data = await response.json();
 
       if (Array.isArray(data)) {
-        // Adapt incoming logs to standard contract
-        const parsedLogs = data.map((item) => ({
-          timestamp: item.timestamp || new Date().toISOString(),
-          ip: item.ip || item.client_ip || item.source_ip || '0.0.0.0',
-          path: item.path || item.url || item.request_uri || '/',
-          risk_score: typeof item.risk_score === 'number' ? item.risk_score : (item.score || 0),
-          status: item.status || (item.risk_score > 70 ? 'killed' : item.risk_score > 30 ? 'suspicious' : 'clean'),
-          token_hash: item.token_hash || item.token || item.session_token || item.session_id || 'N/A'
-        }));
+        // Adapt incoming logs to standard contract matching GateGuard Go proxy /logs endpoint
+        const parsedLogs = data.map((item) => {
+          const tier = item.tier || item.status || (
+            typeof item.risk_score === 'number'
+              ? (item.risk_score > 85 ? 'killed' : item.risk_score > 65 ? 'challenged' : item.risk_score > 30 ? 'suspicious' : 'clean')
+              : 'clean'
+          );
+
+          const tokenHash = item.session_token_hash || item.token_hash || item.token || item.session_token || item.session_id || 'anon';
+          const riskScore = typeof item.risk_score === 'number' ? item.risk_score : (item.risk_score === null ? null : (typeof item.score === 'number' ? item.score : null));
+
+          return {
+            timestamp: item.timestamp || new Date().toISOString(),
+            ip: item.ip || item.client_ip || item.source_ip || '127.0.0.1',
+            path: item.path || item.url || item.request_uri || '/',
+            risk_score: riskScore,
+            status: tier, // Preserve all 5 tier values: clean, challenged, suspicious, killed, blocklisted
+            token_hash: tokenHash,
+            action: item.action || 'forwarded'
+          };
+        });
 
         // Sort newest logs first
         parsedLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -161,11 +175,11 @@ export default function App() {
         currentBatch.forEach((log) => {
           newStatusMap.set(log.token_hash, log.status);
 
-          if (log.status === 'killed') {
+          if (log.status === 'killed' || log.status === 'blocklisted') {
             const prevStatus = prevStatusMapRef.current.get(log.token_hash);
 
-            // Trigger ONLY if previously initialized AND status transitioned to 'killed' (was not 'killed' before)
-            if (hasInitializedRef.current && prevStatus !== 'killed') {
+            // Trigger ONLY if previously initialized AND status transitioned to 'killed'/'blocklisted'
+            if (hasInitializedRef.current && prevStatus !== 'killed' && prevStatus !== 'blocklisted') {
               newlyKilledSessions.push(log);
             }
           }
@@ -237,7 +251,7 @@ export default function App() {
 
   // Derived properties
   const latestLog = logs[0] || null;
-  const killedCount = logs.filter((l) => l.status === 'killed').length;
+  const killedCount = logs.filter((l) => l.status === 'killed' || l.status === 'blocklisted').length;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans relative overflow-x-hidden">
@@ -256,7 +270,7 @@ export default function App() {
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="bg-rose-600 text-white text-[11px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider animate-ping">
-                    CRITICAL BLOCK
+                    {alert.status === 'blocklisted' ? 'PRE-CHECK BLOCK' : 'CRITICAL BLOCK'}
                   </span>
                   <span className="text-xs text-rose-300 font-semibold">
                     {new Date(alert.timestamp).toLocaleTimeString()}
@@ -264,11 +278,11 @@ export default function App() {
                 </div>
 
                 <h4 className="text-base font-extrabold text-white tracking-wide flex items-center gap-1.5">
-                  <span>🚫 Session <code className="bg-rose-950 px-1.5 py-0.5 rounded text-rose-300 border border-rose-500/40">{alert.token_hash}</code> KILLED</span>
+                  <span>🚫 Session <code className="bg-rose-950 px-1.5 py-0.5 rounded text-rose-300 border border-rose-500/40">{alert.token_hash}</code> {alert.status === 'blocklisted' ? 'BLOCKLISTED' : 'KILLED'}</span>
                 </h4>
 
                 <p className="text-xs text-rose-200 font-medium">
-                  Rule Trigger: <span className="font-bold text-white">2 STRIKES DETECTED</span> | Risk Score: <span className="bg-rose-500/30 text-rose-200 px-1.5 py-0.5 rounded font-bold">{alert.risk_score}</span>
+                  Rule Trigger: <span className="font-bold text-white">{alert.status === 'blocklisted' ? 'BLOCKLIST HIT (INSTANT REJECTION)' : '2 STRIKES DETECTED'}</span> | Risk Score: <span className="bg-rose-500/30 text-rose-200 px-1.5 py-0.5 rounded font-bold">{alert.risk_score}</span>
                 </p>
 
                 <div className="text-[11px] text-slate-300 bg-slate-900/90 p-2 rounded-lg border border-rose-500/30 font-mono space-y-0.5">

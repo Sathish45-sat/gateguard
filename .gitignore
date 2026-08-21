@@ -1,2 +1,7 @@
-
 *.exe~
+__pycache__/
+*.pyc
+scratch/
+dashboard/node_modules/
+dashboard/dist/
+.env

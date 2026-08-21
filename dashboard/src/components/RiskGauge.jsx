@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, ShieldAlert, ShieldCheck, Skull, Terminal, Key } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, Skull, Terminal, Key, Clock, Ban } from 'lucide-react';
 
 export default function RiskGauge({ latestLog }) {
   if (!latestLog) {
@@ -22,31 +22,50 @@ export default function RiskGauge({ latestLog }) {
     icon: ShieldCheck
   };
 
-  if (status === 'suspicious' || (risk_score > 30 && risk_score <= 70)) {
+  if (status === 'challenged') {
+    colorTheme = {
+      text: 'text-cyan-400',
+      stroke: '#06b6d4',
+      glow: 'soc-glow-cyan',
+      badgeBg: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
+      label: 'CHALLENGED (DELAY)',
+      icon: Clock
+    };
+  } else if (status === 'suspicious') {
     colorTheme = {
       text: 'text-amber-400',
       stroke: '#f59e0b',
       glow: 'soc-glow-amber',
       badgeBg: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-      label: 'MEDIUM RISK (SUSPICIOUS)',
+      label: 'STRIKE 1 (SUSPICIOUS)',
       icon: ShieldAlert
     };
-  } else if (status === 'killed' || risk_score > 70) {
+  } else if (status === 'killed') {
     colorTheme = {
       text: 'text-rose-400',
       stroke: '#f43f5e',
       glow: 'soc-glow-rose',
       badgeBg: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
-      label: 'HIGH RISK (KILLED)',
+      label: 'STRIKE 2 (KILLED)',
       icon: Skull
+    };
+  } else if (status === 'blocklisted') {
+    colorTheme = {
+      text: 'text-purple-400',
+      stroke: '#a855f7',
+      glow: 'soc-glow-purple',
+      badgeBg: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+      label: 'BLOCKLISTED (PRE-CHECK)',
+      icon: Ban
     };
   }
 
-  // SVG Gauge radial progress math (radius = 70, circumference = 2 * PI * 70 = 439.82)
+  // SVG Gauge radial progress math (radius = 68, circumference = 2 * PI * 68 = 427.26)
   const radius = 68;
   const strokeWidth = 10;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (risk_score / 100) * circumference;
+  const scoreNum = typeof risk_score === 'number' ? risk_score : (status === 'blocklisted' ? 100 : 0);
+  const strokeDashoffset = circumference - (scoreNum / 100) * circumference;
 
   const StatusIcon = colorTheme.icon;
 
@@ -103,10 +122,10 @@ export default function RiskGauge({ latestLog }) {
           {/* Centered Score Counter */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
             <span className={`text-4xl font-extrabold font-mono tracking-tight ${colorTheme.text}`}>
-              {risk_score}
+              {typeof risk_score === 'number' ? risk_score : 'N/A'}
             </span>
             <span className="text-[10px] text-slate-400 font-mono tracking-wider uppercase mt-0.5">
-              RISK SCORE
+              {typeof risk_score === 'number' ? 'RISK SCORE' : 'PRE-CHECK BLOCKED'}
             </span>
           </div>
         </div>

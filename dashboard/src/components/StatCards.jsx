@@ -4,9 +4,12 @@ import { Activity, ShieldCheck, AlertTriangle, Skull, Gauge } from 'lucide-react
 export default function StatCards({ logs, killedCount }) {
   const total = logs.length;
   const cleanCount = logs.filter(l => l.status === 'clean').length;
-  const suspiciousCount = logs.filter(l => l.status === 'suspicious').length;
-  const avgScore = total > 0 
-    ? Math.round(logs.reduce((acc, l) => acc + l.risk_score, 0) / total) 
+  const suspiciousCount = logs.filter(l => l.status === 'suspicious' || l.status === 'challenged').length;
+  
+  // Exclude null/unscored requests from average calculation
+  const scoredLogs = logs.filter(l => typeof l.risk_score === 'number');
+  const avgScore = scoredLogs.length > 0 
+    ? Math.round(scoredLogs.reduce((acc, l) => acc + l.risk_score, 0) / scoredLogs.length) 
     : 0;
 
   const stats = [
@@ -28,7 +31,7 @@ export default function StatCards({ logs, killedCount }) {
       border: 'border-emerald-500/20'
     },
     {
-      title: 'SUSPICIOUS FLAGGED',
+      title: 'SUSPICIOUS / CHALLENGED',
       value: suspiciousCount,
       subText: total > 0 ? `${Math.round((suspiciousCount / total) * 100)}%` : '0%',
       icon: AlertTriangle,
@@ -37,7 +40,7 @@ export default function StatCards({ logs, killedCount }) {
       border: 'border-amber-500/20'
     },
     {
-      title: 'KILLED SESSIONS',
+      title: 'KILLED & BLOCKED',
       value: killedCount,
       icon: Skull,
       color: 'text-rose-400',
@@ -49,9 +52,9 @@ export default function StatCards({ logs, killedCount }) {
       value: avgScore,
       subText: '/ 100',
       icon: Gauge,
-      color: avgScore > 60 ? 'text-rose-400' : avgScore > 30 ? 'text-amber-400' : 'text-emerald-400',
-      bg: avgScore > 60 ? 'bg-rose-500/10' : avgScore > 30 ? 'bg-amber-500/10' : 'bg-emerald-500/10',
-      border: avgScore > 60 ? 'border-rose-500/20' : avgScore > 30 ? 'border-amber-500/20' : 'border-emerald-500/20'
+      color: avgScore > 65 ? 'text-rose-400' : avgScore > 30 ? 'text-amber-400' : 'text-emerald-400',
+      bg: avgScore > 65 ? 'bg-rose-500/10' : avgScore > 30 ? 'bg-amber-500/10' : 'bg-emerald-500/10',
+      border: avgScore > 65 ? 'border-rose-500/20' : avgScore > 30 ? 'border-amber-500/20' : 'border-emerald-500/20'
     }
   ];
 
