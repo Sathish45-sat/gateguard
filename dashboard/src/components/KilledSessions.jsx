@@ -7,10 +7,10 @@ export default function KilledSessions({ logs, isGlowing }) {
 
   return (
     <div 
-      className={`soc-card rounded-2xl p-6 flex flex-col h-full transition-all duration-500 ${
+      className={`soc-card rounded-2xl p-6 flex flex-col h-full transition-all duration-300 ${
         isGlowing 
-          ? 'ring-4 ring-rose-500/90 border-rose-500 soc-glow-rose-strong animate-pulse-glow scale-[1.015]' 
-          : 'soc-glow-rose/20'
+          ? 'animate-pulse-glow-3x' 
+          : 'border-slate-800'
       }`}
     >
       
@@ -19,7 +19,7 @@ export default function KilledSessions({ logs, isGlowing }) {
         <div className="flex items-center space-x-2">
           <div className={`p-1.5 rounded border transition-colors ${
             isGlowing 
-              ? 'bg-rose-500 text-white border-rose-300 animate-bounce' 
+              ? 'bg-rose-500/30 text-rose-300 border-rose-400 animate-pop-3x' 
               : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
           }`}>
             <Skull className="w-4 h-4" />
@@ -36,7 +36,7 @@ export default function KilledSessions({ logs, isGlowing }) {
 
         <div className={`px-2.5 py-1 rounded-md text-xs font-bold font-mono transition-all ${
           isGlowing
-            ? 'bg-rose-600 text-white border border-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.9)] animate-pulse'
+            ? 'bg-rose-600 text-white border border-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.8)] animate-pop-3x'
             : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
         }`}>
           {killedLogs.length} BLOCKED
@@ -55,9 +55,9 @@ export default function KilledSessions({ logs, isGlowing }) {
             return (
               <div
                 key={index}
-                className={`bg-slate-900/80 border rounded-xl p-3 font-mono text-xs transition-all hover:translate-x-1 ${
+                className={`bg-slate-900/80 border rounded-xl p-3 font-mono text-xs transition-all ${
                   index === 0 && isGlowing
-                    ? 'border-rose-400 bg-rose-950/40 shadow-[0_0_20px_rgba(244,63,94,0.5)] scale-[1.02]'
+                    ? 'border-rose-500/60 bg-rose-950/20'
                     : isBlocklisted
                     ? 'border-purple-500/40 bg-purple-950/20 hover:border-purple-500/70'
                     : 'border-rose-500/30 hover:border-rose-500/60'

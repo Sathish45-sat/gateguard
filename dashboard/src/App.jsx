@@ -66,7 +66,7 @@ export default function App() {
   const [soundEnabled, setSoundEnabled] = useState(false); // Default OFF for demo room safety
 
   // Refs for tracking diffs across 2-second polls
-  const prevStatusMapRef = useRef(new Map()); // Map<token_hash, status>
+  const seenKilledTokensRef = useRef(new Set()); // Set of token hashes that already fired a kill alert
   const hasInitializedRef = useRef(false);
 
   /**
@@ -90,11 +90,11 @@ export default function App() {
       });
     }, 5000);
 
-    // 2. Pulse border glow on Killed Sessions Panel (active for 3.5s)
+    // 2. Pulse border glow on Killed Sessions Panel (active for exactly 3 pulses = 2.4s)
     setKilledPanelGlowing(true);
     setTimeout(() => {
       setKilledPanelGlowing(false);
-    }, 3500);
+    }, 2400);
 
     // 3. Add Toast/Banner notification
     const alertId = `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
@@ -112,10 +112,10 @@ export default function App() {
 
     setKillAlerts((prev) => [newAlert, ...prev.slice(0, 2)]); // Keep max 3 active alerts
 
-    // Auto-dismiss toast after 6 seconds
+    // Auto-dismiss toast after 4.5 seconds
     setTimeout(() => {
       setKillAlerts((prev) => prev.filter((a) => a.id !== alertId));
-    }, 6000);
+    }, 4500);
 
     // 4. Play audio cue if enabled by user
     if (soundEnabled) {
@@ -168,27 +168,21 @@ export default function App() {
         parsedLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         const currentBatch = parsedLogs.slice(0, 50);
 
-        // --- DIFF LOGIC BETWEEN PREVIOUS POLL & NEW POLL ---
-        const newStatusMap = new Map();
+        // --- DIFF LOGIC: Trigger alert ONCE per newly killed token ---
         const newlyKilledSessions = [];
 
         currentBatch.forEach((log) => {
-          newStatusMap.set(log.token_hash, log.status);
-
           if (log.status === 'killed' || log.status === 'blocklisted') {
-            const prevStatus = prevStatusMapRef.current.get(log.token_hash);
-
-            // Trigger ONLY if previously initialized AND status transitioned to 'killed'/'blocklisted'
-            if (hasInitializedRef.current && prevStatus !== 'killed' && prevStatus !== 'blocklisted') {
-              newlyKilledSessions.push(log);
+            if (!seenKilledTokensRef.current.has(log.token_hash)) {
+              seenKilledTokensRef.current.add(log.token_hash);
+              if (hasInitializedRef.current) {
+                newlyKilledSessions.push(log);
+              }
             }
           }
         });
 
-        // Update previous map ref for the next poll
-        prevStatusMapRef.current = newStatusMap;
-
-        // Fire money shot for any newly killed sessions from this poll
+        // Fire money shot only for newly identified killed sessions
         if (hasInitializedRef.current && newlyKilledSessions.length > 0) {
           newlyKilledSessions.forEach((killedItem) => triggerKillMoment(killedItem));
         }
@@ -256,43 +250,43 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans relative overflow-x-hidden">
       
-      {/* --- PROMINENT DEMO KILL-EVENT TOAST / BANNER NOTIFICATIONS --- */}
-      <div className="fixed top-20 right-4 left-4 sm:left-auto sm:right-6 z-50 flex flex-col space-y-3 max-w-xl pointer-events-none">
+      {/* --- REFINED DEMO KILL-EVENT TOAST / BANNER NOTIFICATIONS --- */}
+      <div className="fixed top-20 right-4 left-4 sm:left-auto sm:right-6 z-50 flex flex-col space-y-3 max-w-md pointer-events-none">
         {killAlerts.map((alert) => (
           <div
             key={alert.id}
-            className="pointer-events-auto bg-slate-950/95 border-2 border-rose-500 rounded-2xl p-4 shadow-[0_0_50px_rgba(244,63,94,0.8)] text-rose-100 font-mono animate-bounce backdrop-blur-xl flex items-start justify-between gap-4 border-l-8 border-l-rose-500 soc-glow-rose-strong"
+            className="pointer-events-auto bg-slate-900/95 border border-rose-500/50 rounded-xl p-4 shadow-xl text-rose-100 font-mono backdrop-blur-xl flex items-start justify-between gap-3 border-l-4 border-l-rose-500 transition-all duration-300"
           >
-            <div className="flex items-start space-x-3.5">
-              <div className="p-2.5 rounded-xl bg-rose-600 text-white shadow-[0_0_20px_rgba(244,63,94,0.9)] animate-pulse shrink-0 mt-0.5">
-                <Skull className="w-6 h-6" />
+            <div className="flex items-start space-x-3">
+              <div className="p-2 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30 shrink-0 mt-0.5">
+                <Skull className="w-5 h-5" />
               </div>
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="bg-rose-600 text-white text-[11px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider animate-ping">
-                    {alert.status === 'blocklisted' ? 'PRE-CHECK BLOCK' : 'CRITICAL BLOCK'}
+                  <span className="bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                    {alert.status === 'blocklisted' ? 'PRE-CHECK BLOCK' : 'SESSION REVOKED'}
                   </span>
-                  <span className="text-xs text-rose-300 font-semibold">
+                  <span className="text-xs text-slate-400">
                     {new Date(alert.timestamp).toLocaleTimeString()}
                   </span>
                 </div>
 
-                <h4 className="text-base font-extrabold text-white tracking-wide flex items-center gap-1.5">
-                  <span>🚫 Session <code className="bg-rose-950 px-1.5 py-0.5 rounded text-rose-300 border border-rose-500/40">{alert.token_hash}</code> {alert.status === 'blocklisted' ? 'BLOCKLISTED' : 'KILLED'}</span>
+                <h4 className="text-sm font-bold text-white tracking-wide flex items-center gap-1.5">
+                  <span>Session <code className="bg-slate-950 px-1.5 py-0.5 rounded text-rose-300 border border-rose-500/30">{alert.token_hash}</code> {alert.status === 'blocklisted' ? 'BLOCKED' : 'KILLED'}</span>
                 </h4>
 
-                <p className="text-xs text-rose-200 font-medium">
-                  Rule Trigger: <span className="font-bold text-white">{alert.status === 'blocklisted' ? 'BLOCKLIST HIT (INSTANT REJECTION)' : '2 STRIKES DETECTED'}</span> | Risk Score: <span className="bg-rose-500/30 text-rose-200 px-1.5 py-0.5 rounded font-bold">{alert.risk_score}</span>
+                <p className="text-xs text-slate-300">
+                  Trigger: <span className="font-semibold text-rose-300">{alert.status === 'blocklisted' ? 'Blocklist Pre-check' : 'Two-Strike Limit'}</span> | Score: <span className="font-semibold text-rose-300">{alert.risk_score}</span>
                 </p>
 
-                <div className="text-[11px] text-slate-300 bg-slate-900/90 p-2 rounded-lg border border-rose-500/30 font-mono space-y-0.5">
-                  <div className="truncate max-w-sm" title={alert.path}>
-                    <span className="text-slate-400">PATH: </span>
-                    <span className="text-cyan-300 font-semibold">{alert.path}</span>
+                <div className="text-[11px] text-slate-400 bg-slate-950/70 p-2 rounded border border-slate-800 font-mono space-y-0.5 mt-1">
+                  <div className="truncate max-w-xs" title={alert.path}>
+                    <span className="text-slate-500">PATH: </span>
+                    <span className="text-slate-300">{alert.path}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400">SOURCE IP: </span>
-                    <span className="text-slate-200 font-bold">{alert.ip}</span>
+                    <span className="text-slate-500">IP: </span>
+                    <span className="text-slate-300">{alert.ip}</span>
                   </div>
                 </div>
               </div>
@@ -300,10 +294,10 @@ export default function App() {
 
             <button
               onClick={() => removeAlert(alert.id)}
-              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-rose-900/40 transition-colors shrink-0"
-              title="Dismiss Alert"
+              className="text-slate-500 hover:text-slate-200 p-1 rounded hover:bg-slate-800 transition-colors shrink-0"
+              title="Dismiss"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         ))}

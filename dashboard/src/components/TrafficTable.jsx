@@ -105,9 +105,9 @@ export default function TrafficTable({ logs, recentlyKilledTokens = new Set() })
                 let statusBadge = null;
 
                 if (isRecentlyKilled) {
-                  rowStyle = 'animate-kill-flash border-l-4 border-l-rose-500 text-rose-100 font-bold z-20 relative';
+                  rowStyle = 'animate-kill-flash-3x border-l-4 border-l-rose-500 text-rose-100 font-medium z-10 relative';
                   statusBadge = (
-                    <span className="px-2.5 py-1 rounded text-[10px] font-extrabold bg-rose-600 text-white border border-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.9)] inline-flex items-center space-x-1.5 animate-bounce">
+                    <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-rose-600 text-white border border-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.7)] inline-flex items-center space-x-1.5 animate-pop-3x">
                       <Skull className="w-3.5 h-3.5 text-white" />
                       <span>{log.status === 'blocklisted' ? 'BLOCKED' : 'JUST KILLED'}</span>
                     </span>
